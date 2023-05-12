@@ -1,0 +1,71 @@
+import pandas as pd
+import csv
+import numpy as np
+import datetime
+import string
+import xlsxwriter
+recipes=pd.read_csv('recipes_sample.csv',parse_dates=['submitted'])
+reviews=pd.read_csv('reviews_sample.csv')
+print(recipes.submitted.info())
+print('1.2 Количество точек данных (строк) в таблице recipes:',recipes.shape[0],'\n')
+print('1.2 Количество столбцов в таблице recipes:',recipes.shape[1],'\n')
+print('1.2 Тип данных каждого столбца в таблице recipes:','\n',recipes.dtypes,'\n')
+print('1.2 Количество точек данных (строк) в таблице reviews:',reviews.shape[0],'\n')
+print('1.2 Количество столбцов в таблице reviews:',reviews.shape[1],'\n')
+print('1.2 Тип данных каждого столбца в таблице reviews:','\n',reviews.dtypes,'\n')
+print('1.3.A Количество пропусков в cтобцах таблицы recipes:','\n',recipes.isnull().sum(),'\n')
+print('1.3.А Доля строк в которых имеются пропуски в таблице recipes : ',(recipes.isnull().sum(axis=1)!=0).sum()/recipes.shape[0],'\n')
+print('1.3.Б Количество пропусков в cтобцах таблицы reviews:','\n',reviews.isnull().sum(),'\n')
+print('1.3.Б Доля строк в которых имеются пропуски в таблице reviews : ',(reviews.isnull().sum(axis=1)!=0).sum()/reviews.shape[0],'\n')
+print('1.4 Среднее количество ингридиентов в рецептах: ',recipes.n_ingredients.mean(),'\n')
+print('1.4 Средний рейтинг рецептов : ',reviews.rating.mean(),'\n')
+print('1.4 Среднее время приготовления рецептов : ',recipes.minutes.mean(),'\n')
+print('1.4 Среднее количество шагов в приготовлении рецептов : ',recipes.n_steps.mean(),'\n')
+print('1.5 Десять случайных названий рецептов: ','\n',recipes.name.sample(10),'\n')
+reviews.iloc[:,[0]]=range(0,reviews.shape[0])
+print('1.6 Задание выполнено !','\n')
+print('1.7 Информация о рецептах, время выполнения которых не больше 20 минут и кол-во ингредиентов в которых не больше 5: ','\n',recipes.loc[(recipes['minutes']<=20)&(recipes['n_ingredients']<=5)],'\n')
+print('2.1 Задание выполнено !','\n')
+print('2.2 Информация о рецептах, добавленных в датасет не позже 2010 года: ','\n',recipes.loc[recipes['submitted']>=(datetime.datetime(2010,1,1))],'\n')
+recipes['description_length']=recipes['description'].str.len()
+print('3.1 Задание выполнено !','\n')
+recipes['name']=recipes['name'].str.capitalize()
+print('3.2 Задание выполнено !','\n')
+recipes['name_word_count']=(recipes['name'].str.split()).str.len()
+print('3.3 Задание выполнено !','\n')
+print('4.1 Количество рецептов, представленных каждым из участников : ','\n','(id участника - количество рецептов)','\n', recipes['contributor_id'].value_counts(),'\n')
+print('4.1 ID участника, который добавил максимальное кол-во рецептов: ',recipes['contributor_id'].value_counts().index[0],'\n')
+reviews['rating']=reviews['rating'].fillna(0)
+print('4.2 Средний рейтинг к каждому из рецептов: ','\n',reviews.groupby('recipe_id')['rating'].mean(),'\n')
+print('4.2 Количество рецептов к которым отсутствуют отзывы: ', reviews['review'].isna().sum(),'\n')
+recipes['Year']=pd.DatetimeIndex(recipes['submitted']).year
+print('4.3 Количество рецептов с разбивкой по годам создания : ','\n',recipes.groupby('Year')['Year'].count(),'\n')
+recipes=recipes.drop(['Year'],axis=1)
+DataFrame=pd.concat([recipes.id,recipes.name,reviews.user_id,reviews.rating,reviews.review],sort=False,axis=1)
+DataFrame=DataFrame.drop(DataFrame.loc[DataFrame['review'].isna()].index)
+DataFrame=DataFrame.drop(['review'],axis=1)
+print('5.1 User_ID который будем проверять в новом DataFrame: ',reviews.iloc[reviews[reviews['review'].isna()].user_id.index[0]].user_id,'\n','Содержится ли данный User_ID в новом DataFrame ?')
+if reviews.iloc[reviews[reviews['review'].isna()].user_id.index[0]].user_id in DataFrame.values:
+    print('Да','\n')
+else:
+    print('Нет','\n')
+reviews['review_counts']=1
+reviews.loc[reviews['review'].isna()==True,'review_counts']=0
+a=reviews.groupby('recipe_id',sort=False)['review_counts'].sum().reset_index(name='review_count')
+reviews=reviews.drop(['review_counts'],axis=1)
+df=pd.concat([pd.merge(reviews['recipe_id'],a,how='left'),recipes['name']],sort=False,axis=1)
+df=df[['name','recipe_id','review_count']]
+print('5.2 Новый ДатаФрейм: ','\n',df,'\n')
+print('5.2а Строка с пустым отзывом: ','\n',reviews.iloc[reviews[reviews['review'].isna()].index[0]],'\n')
+print('5.2б Строка с тем же номером строки, но в новом ДатаФрейме ','\n',df.iloc[reviews[reviews['review'].isna()].index[0]],'\n')
+reviews['Year']=pd.DatetimeIndex(reviews['date']).year
+print('5.3 Год в котором средний рейтинг рецептов ниже остальных (год/рейтинг) :','\n',reviews.groupby('Year')['rating'].mean().sort_values(ascending=True).head(1),'\n')
+reviews=reviews.drop(['Year'],axis=1)
+recipes=recipes.sort_values(by=['name_word_count'], ascending=False)
+recipes.to_csv('name_word_count1.csv', index= False )
+print('6.1 Задание выполнено !','\n')
+obj=pd.ExcelWriter('Рецепты.xlsx',engine='xlsxwriter')
+DataFrame.to_excel(obj, sheet_name='Рецепты с оценками',index=False)
+df.to_excel(obj, sheet_name='Количество отзывов по рецептам',index=False)
+obj.close()
+print('6.2 Задание выполнено !','\n')
